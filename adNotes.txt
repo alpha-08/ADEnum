@@ -4,7 +4,7 @@ https://github.com/samratashok/ADModule/blob/master/Microsoft.ActiveDirectory.Ma
 
 you need to download both of above in order to run the ActiveDirectory module.
 
-remove the comments and then run the following commands:
+Remove the comments and then run the following commands:
 
 Import-Module .\admod1.ps1
 Import-ActiveDirectory -ActiveDirectoryModule .\Microsoft.ActiveDirectory.Management.dll
@@ -19,5 +19,4 @@ Get-ADDomainController -Filter * | Select Name,Site,IPv4Address
 
 Get-ADUser -Filter {ServicePrincipalName -ne "$null"} -Properties ServicePrincipalName | select GiveName,SurName,UserPrincipalName,SamAccountName,SID,DistinguishedName,Name,Enabled
 
-If krbtgt account is being used as a service account and its password is compromised, it can be used to create forged kerberos tickets and gain unauthorized access to parts of network. To prevent this, use best practices such as 
-using a separate account for each service, rotating passwords regularly, and using strong password policies.
+If krbtgt account is being used as a service account and its password is compromised, it can be used to create forged kerberos tickets and gain unauthorized access to parts of network. To prevent this, use best practices such as using a separate account for each service, rotating passwords regularly, and using strong password policies.
