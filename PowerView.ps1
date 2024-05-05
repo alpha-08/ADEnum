@@ -135,7 +135,7 @@ function Add-Win32Type
         }
         else
         {
-            # Define one type for each DLL
+            
             if (!$TypeHash.ContainsKey($DllName))
             {
                 if ($Namespace)
@@ -249,7 +249,7 @@ function psenum
 
     ForEach ($Key in $EnumElements.Keys)
     {
-        # Apply the specified enum type to each element
+        
         $Null = $EnumBuilder.DefineLiteral($Key, $EnumElements[$Key] -as $EnumType)
     }
 
@@ -377,8 +377,7 @@ function struct
         if ($ExplicitLayout) { $NewField.SetOffset($Offset) }
     }
 
-    # Make the struct aware of its own size.
-    # No more having to call [Runtime.InteropServices.Marshal]::SizeOf!
+
     $SizeMethod = $StructBuilder.DefineMethod('GetSize',
         'Public, Static',
         [Int],
@@ -1153,7 +1152,7 @@ filter Get-DomainSearcher {
         }
         elseif(-not $DomainController) {
             try {
-                # if there's no -DomainController specified, try to pull the primary DC to reflect queries through
+                
                 $DomainController = ((Get-NetDomain).PdcRoleOwner).Name
             }
             catch {
@@ -1267,7 +1266,7 @@ filter Convert-DNSRecord {
     $UpdatedAtSerial = [BitConverter]::ToUInt32($DNSRecord, 8)
 
     $TTLRaw = $DNSRecord[12..15]
-    # reverse for big endian
+    
     $Null = [array]::Reverse($TTLRaw)
     $TTL = [BitConverter]::ToUInt32($TTLRaw, 0)
 
@@ -1707,14 +1706,14 @@ function Get-NetUser {
     )
 
     begin {
-        # so this isn't repeated if users are passed on the pipeline
+        
         $UserSearcher = Get-DomainSearcher -Domain $Domain -ADSpath $ADSpath -DomainController $DomainController -PageSize $PageSize -Credential $Credential
     }
 
     process {
         if($UserSearcher) {
 
-            # if we're checking for unconstrained delegation
+            
             if($Unconstrained) {
                 Write-Verbose "Checking for unconstrained delegation"
                 $Filter += "(userAccountControl:1.2.840.113556.1.4.803:=524288)"
@@ -1729,16 +1728,16 @@ function Get-NetUser {
                 $Filter += "(admincount=1)"
             }
 
-            # check if we're using a username filter or not
+            
             if($UserName) {
-                # samAccountType=805306368 indicates user objects
+                
                 $UserSearcher.filter="(&(samAccountType=805306368)(samAccountName=$UserName)$Filter)"
             }
             elseif($SPN) {
                 $UserSearcher.filter="(&(samAccountType=805306368)(servicePrincipalName=*)$Filter)"
             }
             else {
-                # filter is something like "(samAccountName=*blah*)" if specified
+                
                 $UserSearcher.filter="(&(samAccountType=805306368)$Filter)"
             }
 
@@ -1757,66 +1756,6 @@ function Get-NetUser {
 
 
 function Add-NetUser {
-<#
-    .SYNOPSIS
-
-        Adds a domain user or a local user to the current (or remote) machine,
-        if permissions allow, utilizing the WinNT service provider and
-        DirectoryServices.AccountManagement, respectively.
-        
-        The default behavior is to add a user to the local machine.
-        An optional group name to add the user to can be specified.
-
-    .PARAMETER UserName
-
-        The username to add. If not given, it defaults to 'backdoor'
-
-    .PARAMETER Password
-
-        The password to set for the added user. If not given, it defaults to 'Password123!'
-
-    .PARAMETER GroupName
-
-        Group to optionally add the user to.
-
-    .PARAMETER ComputerName
-
-        Hostname to add the local user to, defaults to 'localhost'
-
-    .PARAMETER Domain
-
-        Specified domain to add the user to.
-
-    .EXAMPLE
-
-        PS C:\> Add-NetUser -UserName john -Password 'Password123!'
-        
-        Adds a localuser 'john' to the local machine with password of 'Password123!'
-
-    .EXAMPLE
-
-        PS C:\> Add-NetUser -UserName john -Password 'Password123!' -ComputerName server.testlab.local
-        
-        Adds a localuser 'john' with password of 'Password123!' to server.testlab.local's local Administrators group.
-
-    .EXAMPLE
-
-        PS C:\> Add-NetUser -UserName john -Password password -GroupName "Domain Admins" -Domain ''
-        
-        Adds the user "john" with password "password" to the current domain and adds
-        the user to the domain group "Domain Admins"
-
-    .EXAMPLE
-
-        PS C:\> Add-NetUser -UserName john -Password password -GroupName "Domain Admins" -Domain 'testing'
-        
-        Adds the user "john" with password "password" to the 'testing' domain and adds
-        the user to the domain group "Domain Admins"
-
-    .Link
-
-        http://blogs.technet.com/b/heyscriptingguy/archive/2010/11/23/use-powershell-to-create-local-user-accounts.aspx
-#>
 
     [CmdletBinding()]
     Param (
@@ -1850,17 +1789,16 @@ function Add-NetUser {
             return $Null
         }
 
-        # add the assembly we need
+        
         Add-Type -AssemblyName System.DirectoryServices.AccountManagement
 
-        # http://richardspowershellblog.wordpress.com/2008/05/25/system-directoryservices-accountmanagement/
-        # get the domain context
+        
         $Context = New-Object -TypeName System.DirectoryServices.AccountManagement.PrincipalContext -ArgumentList ([System.DirectoryServices.AccountManagement.ContextType]::Domain), $DomainObject
 
-        # create the user object
+        
         $User = New-Object -TypeName System.DirectoryServices.AccountManagement.UserPrincipal -ArgumentList $Context
 
-        # set user properties
+        
         $User.Name = $UserName
         $User.SamAccountName = $UserName
         $User.PasswordNotRequired = $False
@@ -1870,7 +1808,7 @@ function Add-NetUser {
         Write-Verbose "Creating user $UserName to with password '$Password' in domain $Domain"
 
         try {
-            # commit the user
+            
             $User.Save()
             "[*] User $UserName successfully created in domain $Domain"
         }
@@ -1883,12 +1821,12 @@ function Add-NetUser {
         
         Write-Verbose "Creating user $UserName to with password '$Password' on $ComputerName"
 
-        # if it's not a domain add, it's a local machine add
+        
         $ObjOu = [ADSI]"WinNT://$ComputerName"
         $ObjUser = $ObjOu.Create('User', $UserName)
         $ObjUser.SetPassword($Password)
 
-        # commit the changes to the local machine
+        
         try {
             $Null = $ObjUser.SetInfo()
             "[*] User $UserName successfully created on host $ComputerName"
@@ -1899,14 +1837,14 @@ function Add-NetUser {
         }
     }
 
-    # if a group is specified, invoke Add-NetGroupUser and return its value
+    
     if ($GroupName) {
-        # if we're adding the user to a domain
+        
         if ($Domain) {
             Add-NetGroupUser -UserName $UserName -GroupName $GroupName -Domain $Domain
             "[*] User $UserName successfully added to group $GroupName in domain $Domain"
         }
-        # otherwise, we're adding to a local group
+        
         else {
             Add-NetGroupUser -UserName $UserName -GroupName $GroupName -ComputerName $ComputerName
             "[*] User $UserName successfully added to group $GroupName on host $ComputerName"
@@ -1916,41 +1854,6 @@ function Add-NetUser {
 
 
 function Add-NetGroupUser {
-<#
-    .SYNOPSIS
-
-        Adds a user to a domain group or a local group on the current (or remote) machine,
-        if permissions allow, utilizing the WinNT service provider and
-        DirectoryServices.AccountManagement, respectively.
-
-    .PARAMETER UserName
-
-        The domain username to query for.
-
-    .PARAMETER GroupName
-
-        Group to add the user to.
-
-    .PARAMETER ComputerName
-
-        Hostname to add the user to, defaults to localhost.
-
-    .PARAMETER Domain
-
-        Domain to add the user to.
-
-    .EXAMPLE
-
-        PS C:\> Add-NetGroupUser -UserName john -GroupName Administrators
-        
-        Adds a localuser "john" to the local group "Administrators"
-
-    .EXAMPLE
-
-        PS C:\> Add-NetGroupUser -UserName john -GroupName "Domain Admins" -Domain dev.local
-        
-        Adds the existing user "john" to the domain group "Domain Admins" in "dev.local"
-#>
 
     [CmdletBinding()]
     param(
@@ -1973,10 +1876,10 @@ function Add-NetGroupUser {
         $Domain
     )
 
-    # add the assembly if we need it
+    
     Add-Type -AssemblyName System.DirectoryServices.AccountManagement
 
-    # if we're adding to a remote host's local group, use the WinNT provider
+    
     if($ComputerName -and ($ComputerName -ne "localhost")) {
         try {
             Write-Verbose "Adding user $UserName to $GroupName on host $ComputerName"
