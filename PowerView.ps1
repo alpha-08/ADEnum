@@ -154,7 +154,6 @@ function Add-Win32Type
                 $ReturnType,
                 $ParameterTypes)
 
-            # Make each ByRef parameter an Out parameter
             $i = 1
             ForEach($Parameter in $ParameterTypes)
             {
@@ -172,7 +171,7 @@ function Add-Win32Type
             $CharsetField = $DllImport.GetField('CharSet')
             if ($SetLastError) { $SLEValue = $True } else { $SLEValue = $False }
 
-            # Equivalent to C# version of [DllImport(DllName)]
+
             $Constructor = [Runtime.InteropServices.DllImportAttribute].GetConstructor([String])
             $DllImportAttribute = New-Object Reflection.Emit.CustomAttributeBuilder($Constructor,
                 $DllName, [Reflection.PropertyInfo[]] @(), [Object[]] @(),
@@ -206,70 +205,6 @@ function Add-Win32Type
 
 function psenum
 {
-<#
-    .SYNOPSIS
-
-        Creates an in-memory enumeration for use in your PowerShell session.
-
-        Author: Matthew Graeber (@mattifestation)
-        License: BSD 3-Clause
-        Required Dependencies: None
-        Optional Dependencies: None
-     
-    .DESCRIPTION
-
-        The 'psenum' function facilitates the creation of enums entirely in
-        memory using as close to a "C style" as PowerShell will allow.
-
-    .PARAMETER Module
-
-        The in-memory module that will host the enum. Use
-        New-InMemoryModule to define an in-memory module.
-
-    .PARAMETER FullName
-
-        The fully-qualified name of the enum.
-
-    .PARAMETER Type
-
-        The type of each enum element.
-
-    .PARAMETER EnumElements
-
-        A hashtable of enum elements.
-
-    .PARAMETER Bitfield
-
-        Specifies that the enum should be treated as a bitfield.
-
-    .EXAMPLE
-
-        $Mod = New-InMemoryModule -ModuleName Win32
-
-        $ImageSubsystem = psenum $Mod PE.IMAGE_SUBSYSTEM UInt16 @{
-            UNKNOWN =                  0
-            NATIVE =                   1 # Image doesn't require a subsystem.
-            WINDOWS_GUI =              2 # Image runs in the Windows GUI subsystem.
-            WINDOWS_CUI =              3 # Image runs in the Windows character subsystem.
-            OS2_CUI =                  5 # Image runs in the OS/2 character subsystem.
-            POSIX_CUI =                7 # Image runs in the Posix character subsystem.
-            NATIVE_WINDOWS =           8 # Image is a native Win9x driver.
-            WINDOWS_CE_GUI =           9 # Image runs in the Windows CE subsystem.
-            EFI_APPLICATION =          10
-            EFI_BOOT_SERVICE_DRIVER =  11
-            EFI_RUNTIME_DRIVER =       12
-            EFI_ROM =                  13
-            XBOX =                     14
-            WINDOWS_BOOT_APPLICATION = 16
-        }
-
-    .NOTES
-
-        PowerShell purists may disagree with the naming of this function but
-        again, this was developed in such a way so as to emulate a "C style"
-        definition as closely as possible. Sorry, I'm not going to name it
-        New-Enum. :P
-#>
 
     [OutputType([Type])]
     Param
@@ -322,8 +257,7 @@ function psenum
 }
 
 
-# A helper function used to reduce typing while defining struct
-# fields.
+
 function field
 {
     Param
@@ -355,98 +289,6 @@ function field
 
 function struct
 {
-<#
-    .SYNOPSIS
-
-        Creates an in-memory struct for use in your PowerShell session.
-
-        Author: Matthew Graeber (@mattifestation)
-        License: BSD 3-Clause
-        Required Dependencies: None
-        Optional Dependencies: field
-
-    .DESCRIPTION
-
-        The 'struct' function facilitates the creation of structs entirely in
-        memory using as close to a "C style" as PowerShell will allow. Struct
-        fields are specified using a hashtable where each field of the struct
-        is comprosed of the order in which it should be defined, its .NET
-        type, and optionally, its offset and special marshaling attributes.
-
-        One of the features of 'struct' is that after your struct is defined,
-        it will come with a built-in GetSize method as well as an explicit
-        converter so that you can easily cast an IntPtr to the struct without
-        relying upon calling SizeOf and/or PtrToStructure in the Marshal
-        class.
-
-    .PARAMETER Module
-
-        The in-memory module that will host the struct. Use
-        New-InMemoryModule to define an in-memory module.
-
-    .PARAMETER FullName
-
-        The fully-qualified name of the struct.
-
-    .PARAMETER StructFields
-
-        A hashtable of fields. Use the 'field' helper function to ease
-        defining each field.
-
-    .PARAMETER PackingSize
-
-        Specifies the memory alignment of fields.
-
-    .PARAMETER ExplicitLayout
-
-        Indicates that an explicit offset for each field will be specified.
-
-    .EXAMPLE
-
-        $Mod = New-InMemoryModule -ModuleName Win32
-
-        $ImageDosSignature = psenum $Mod PE.IMAGE_DOS_SIGNATURE UInt16 @{
-            DOS_SIGNATURE =    0x5A4D
-            OS2_SIGNATURE =    0x454E
-            OS2_SIGNATURE_LE = 0x454C
-            VXD_SIGNATURE =    0x454C
-        }
-
-        $ImageDosHeader = struct $Mod PE.IMAGE_DOS_HEADER @{
-            e_magic =    field 0 $ImageDosSignature
-            e_cblp =     field 1 UInt16
-            e_cp =       field 2 UInt16
-            e_crlc =     field 3 UInt16
-            e_cparhdr =  field 4 UInt16
-            e_minalloc = field 5 UInt16
-            e_maxalloc = field 6 UInt16
-            e_ss =       field 7 UInt16
-            e_sp =       field 8 UInt16
-            e_csum =     field 9 UInt16
-            e_ip =       field 10 UInt16
-            e_cs =       field 11 UInt16
-            e_lfarlc =   field 12 UInt16
-            e_ovno =     field 13 UInt16
-            e_res =      field 14 UInt16[] -MarshalAs @('ByValArray', 4)
-            e_oemid =    field 15 UInt16
-            e_oeminfo =  field 16 UInt16
-            e_res2 =     field 17 UInt16[] -MarshalAs @('ByValArray', 10)
-            e_lfanew =   field 18 Int32
-        }
-
-        # Example of using an explicit layout in order to create a union.
-        $TestUnion = struct $Mod TestUnion @{
-            field1 = field 0 UInt32 0
-            field2 = field 1 IntPtr 0
-        } -ExplicitLayout
-
-    .NOTES
-
-        PowerShell purists may disagree with the naming of this function but
-        again, this was developed in such a way so as to emulate a "C style"
-        definition as closely as possible. Sorry, I'm not going to name it
-        New-Struct. :P
-#>
 
     [OutputType([Type])]
     Param
@@ -498,9 +340,6 @@ function struct
 
     $Fields = New-Object Hashtable[]($StructFields.Count)
 
-    # Sort each field according to the orders specified
-    # Unfortunately, PSv2 doesn't have the luxury of the
-    # hashtable [Ordered] accelerator.
     ForEach ($Field in $StructFields.Keys)
     {
         $Index = $StructFields[$Field]['Position']
@@ -545,7 +384,7 @@ function struct
         [Int],
         [Type[]] @())
     $ILGenerator = $SizeMethod.GetILGenerator()
-    # Thanks for the help, Jason Shirk!
+
     $ILGenerator.Emit([Reflection.Emit.OpCodes]::Ldtoken, $StructBuilder)
     $ILGenerator.Emit([Reflection.Emit.OpCodes]::Call,
         [Type].GetMethod('GetTypeFromHandle'))
@@ -553,8 +392,7 @@ function struct
         [Runtime.InteropServices.Marshal].GetMethod('SizeOf', [Type[]] @([Type])))
     $ILGenerator.Emit([Reflection.Emit.OpCodes]::Ret)
 
-    # Allow for explicit casting from an IntPtr
-    # No more having to call [Runtime.InteropServices.Marshal]::PtrToStructure!
+
     $ImplicitConverter = $StructBuilder.DefineMethod('op_Implicit',
         'PrivateScope, Public, Static, HideBySig, SpecialName',
         $StructBuilder,
@@ -574,25 +412,10 @@ function struct
 }
 
 
-########################################################
-#
-# Misc. helpers
-#
-########################################################
+
 
 filter Get-IniContent {
-<#
-    .SYNOPSIS
 
-        This helper parses an .ini file into a proper PowerShell object.
-        
-        Author: 'The Scripting Guys'
-        Link: https://blogs.technet.microsoft.com/heyscriptingguy/2011/08/20/use-powershell-to-work-with-any-ini-file/
-
-    .LINK
-
-        https://blogs.technet.microsoft.com/heyscriptingguy/2011/08/20/use-powershell-to-work-with-any-ini-file/
-#>
     [CmdletBinding()]
     Param(
         [Parameter(Mandatory=$True, ValueFromPipeline=$True, ValueFromPipelineByPropertyName=$True)]
@@ -605,20 +428,20 @@ filter Get-IniContent {
     ForEach($TargetPath in $Path) {
         $IniObject = @{}
         Switch -Regex -File $TargetPath {
-            "^\[(.+)\]" # Section
+            "^\[(.+)\]" 
             {
                 $Section = $matches[1].Trim()
                 $IniObject[$Section] = @{}
                 $CommentCount = 0
             }
-            "^(;.*)$" # Comment
+            "^(;.*)$" 
             {
                 $Value = $matches[1].Trim()
                 $CommentCount = $CommentCount + 1
                 $Name = 'Comment' + $CommentCount
                 $IniObject[$Section][$Name] = $Value
             } 
-            "(.+?)\s*=(.*)" # Key
+            "(.+?)\s*=(.*)" 
             {
                 $Name, $Value = $matches[1..2]
                 $Name = $Name.Trim()
@@ -632,21 +455,7 @@ filter Get-IniContent {
 }
 
 filter Export-PowerViewCSV {
-<#
-    .SYNOPSIS
 
-        This helper exports an -InputObject to a .csv in a thread-safe manner
-        using a mutex. This is so the various multi-threaded functions in
-        PowerView has a thread-safe way to export output to the same file.
-        
-        Based partially on Dmitry Sotnikov's Export-CSV code
-            at http://poshcode.org/1590
-
-    .LINK
-
-        http://poshcode.org/1590
-        http://dmitrysotnikov.wordpress.com/2010/01/19/Export-Csv-append/
-#>
     Param(
         [Parameter(Mandatory=$True, ValueFromPipeline=$True, ValueFromPipelineByPropertyName=$True)]
         [System.Management.Automation.PSObject[]]
@@ -660,12 +469,12 @@ filter Export-PowerViewCSV {
 
     $ObjectCSV = $InputObject | ConvertTo-Csv -NoTypeInformation
 
-    # mutex so threaded code doesn't stomp on the output file
+
     $Mutex = New-Object System.Threading.Mutex $False,'CSVMutex';
     $Null = $Mutex.WaitOne()
 
     if (Test-Path -Path $OutFile) {
-        # hack to skip the first line of output if the file already exists
+
         $ObjectCSV | ForEach-Object { $Start=$True }{ if ($Start) {$Start=$False} else {$_} } | Out-File -Encoding 'ASCII' -Append -FilePath $OutFile
     }
     else {
@@ -677,25 +486,7 @@ filter Export-PowerViewCSV {
 
 
 filter Get-IPAddress {
-<#
-    .SYNOPSIS
 
-        Resolves a given hostename to its associated IPv4 address. 
-        If no hostname is provided, it defaults to returning
-        the IP address of the localhost.
-
-    .EXAMPLE
-
-        PS C:\> Get-IPAddress -ComputerName SERVER
-        
-        Return the IPv4 address of 'SERVER'
-
-    .EXAMPLE
-
-        PS C:\> Get-Content .\hostnames.txt | Get-IPAddress
-
-        Get the IP addresses of all hostnames in an input file.
-#>
 
     [CmdletBinding()]
     param(
@@ -706,10 +497,10 @@ filter Get-IPAddress {
     )
 
     try {
-        # extract the computer name from whatever object was passed on the pipeline
+
         $Computer = $ComputerName | Get-NameField
 
-        # get the IP resolution of this specified hostname
+
         @(([Net.Dns]::GetHostEntry($Computer)).AddressList) | ForEach-Object {
             if ($_.AddressFamily -eq 'InterNetwork') {
                 $Out = New-Object PSObject
@@ -726,23 +517,7 @@ filter Get-IPAddress {
 
 
 filter Convert-NameToSid {
-<#
-    .SYNOPSIS
 
-        Converts a given user/group name to a security identifier (SID).
-
-    .PARAMETER ObjectName
-
-        The user/group name to convert, can be 'user' or 'DOMAIN\user' format.
-
-    .PARAMETER Domain
-
-        Specific domain for the given user account, defaults to the current domain.
-
-    .EXAMPLE
-
-        PS C:\> Convert-NameToSid 'DEV\dfm'
-#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$True, ValueFromPipeline=$True)]
@@ -757,7 +532,7 @@ filter Convert-NameToSid {
     $ObjectName = $ObjectName -Replace "/","\"
     
     if($ObjectName.Contains("\")) {
-        # if we get a DOMAIN\user format, auto convert it
+
         $Domain = $ObjectName.Split("\")[0]
         $ObjectName = $ObjectName.Split("\")[1]
     }
@@ -782,19 +557,7 @@ filter Convert-NameToSid {
 
 
 filter Convert-SidToName {
-<#
-    .SYNOPSIS
-    
-        Converts a security identifier (SID) to a group/user name.
 
-    .PARAMETER SID
-    
-        The SID to convert.
-
-    .EXAMPLE
-
-        PS C:\> Convert-SidToName S-1-5-21-2620891829-2411261497-1773853088-1105
-#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$True, ValueFromPipeline=$True)]
@@ -806,8 +569,7 @@ filter Convert-SidToName {
     try {
         $SID2 = $SID.trim('*')
 
-        # try to resolve any built-in SIDs first
-        #   from https://support.microsoft.com/en-us/kb/243330
+
         Switch ($SID2) {
             'S-1-0'         { 'Null Authority' }
             'S-1-0-0'       { 'Nobody' }
@@ -884,43 +646,7 @@ filter Convert-SidToName {
 
 
 filter Convert-ADName {
-<#
-    .SYNOPSIS
 
-        Converts user/group names from NT4 (DOMAIN\user) or domainSimple (user@domain.com)
-        to canonical format (domain.com/Users/user) or NT4.
-
-        Based on Bill Stewart's code from this article: 
-            http://windowsitpro.com/active-directory/translating-active-directory-object-names-between-formats
-
-    .PARAMETER ObjectName
-
-        The user/group name to convert.
-
-    .PARAMETER InputType
-
-        The InputType of the user/group name ("NT4","Simple","Canonical").
-
-    .PARAMETER OutputType
-
-        The OutputType of the user/group name ("NT4","Simple","Canonical").
-
-    .EXAMPLE
-
-        PS C:\> Convert-ADName -ObjectName "dev\dfm"
-        
-        Returns "dev.testlab.local/Users/Dave"
-
-    .EXAMPLE
-
-        PS C:\> Convert-SidToName "S-..." | Convert-ADName
-        
-        Returns the canonical name for the resolved SID.
-
-    .LINK
-
-        http://windowsitpro.com/active-directory/translating-active-directory-object-names-between-formats
-#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$True, ValueFromPipeline=$True)]
@@ -973,14 +699,14 @@ filter Convert-ADName {
         }
     }
 
-    # try to extract the domain from the given format
+
     $Domain = Switch($InputType) {
         'NT4' { $ObjectName.split("\")[0] }
         'Simple' { $ObjectName.split("@")[1] }
         'Canonical' { $ObjectName.split("/")[0] }
     }
 
-    # Accessor functions to simplify calls to NameTranslate
+
     function Invoke-Method([__ComObject] $Object, [String] $Method, $Parameters) {
         $Output = $Object.GetType().InvokeMember($Method, "InvokeMethod", $Null, $Object, $Parameters)
         if ( $Output ) { $Output }
@@ -1011,38 +737,7 @@ filter Convert-ADName {
 
 
 function ConvertFrom-UACValue {
-<#
-    .SYNOPSIS
 
-        Converts a UAC int value to human readable form.
-
-    .PARAMETER Value
-
-        The int UAC value to convert.
-
-    .PARAMETER ShowAll
-
-        Show all UAC values, with a + indicating the value is currently set.
-
-    .EXAMPLE
-
-        PS C:\> ConvertFrom-UACValue -Value 66176
-
-        Convert the UAC value 66176 to human readable format.
-
-    .EXAMPLE
-
-        PS C:\> Get-NetUser jason | select useraccountcontrol | ConvertFrom-UACValue
-
-        Convert the UAC value for 'jason' to human readable format.
-
-    .EXAMPLE
-
-        PS C:\> Get-NetUser jason | select useraccountcontrol | ConvertFrom-UACValue -ShowAll
-
-        Convert the UAC value for 'jason' to human readable format, showing all
-        possible UAC values.
-#>
     
     [CmdletBinding()]
     param(
@@ -1054,7 +749,7 @@ function ConvertFrom-UACValue {
     )
 
     begin {
-        # values from https://support.microsoft.com/en-us/kb/305144
+
         $UACValues = New-Object System.Collections.Specialized.OrderedDictionary
         $UACValues.Add("SCRIPT", 1)
         $UACValues.Add("ACCOUNTDISABLE", 2)
@@ -1120,21 +815,7 @@ function ConvertFrom-UACValue {
 
 
 filter Get-Proxy {
-<#
-    .SYNOPSIS
-    
-        Enumerates the proxy server and WPAD conents for the current user.
 
-    .PARAMETER ComputerName
-
-        The computername to enumerate proxy settings on, defaults to local host.
-
-    .EXAMPLE
-
-        PS C:\> Get-Proxy 
-        
-        Returns the current proxy settings.
-#>
     param(
         [Parameter(ValueFromPipeline=$True)]
         [ValidateNotNullOrEmpty()]
@@ -1179,43 +860,7 @@ filter Get-Proxy {
 
 
 function Request-SPNTicket {
-<#
-    .SYNOPSIS
-    
-        Request the kerberos ticket for a specified service principal name (SPN).
-    
-    .PARAMETER SPN
 
-        The service principal name to request the ticket for. Required.
-        
-    .PARAMETER EncPart
-        
-        Switch. Return the encrypted portion of the ticket (cipher).
-
-    .EXAMPLE
-
-        PS C:\> Request-SPNTicket -SPN "HTTP/web.testlab.local"
-    
-        Request a kerberos service ticket for the specified SPN.
-        
-    .EXAMPLE
-
-        PS C:\> Request-SPNTicket -SPN "HTTP/web.testlab.local" -EncPart
-    
-        Request a kerberos service ticket for the specified SPN and return the encrypted portion of the ticket.
-
-    .EXAMPLE
-
-        PS C:\> "HTTP/web1.testlab.local","HTTP/web2.testlab.local" | Request-SPNTicket
-
-        Request kerberos service tickets for all SPNs passed on the pipeline.
-
-    .EXAMPLE
-
-        PS C:\> Get-NetUser -SPN | Request-SPNTicket
-
-        Request kerberos service tickets for all users with non-null SPNs.
-#>
 
     [CmdletBinding()]
     Param (
@@ -1257,25 +902,7 @@ function Request-SPNTicket {
 
 
 function Get-PathAcl {
-<#
-    .SYNOPSIS
-    
-        Enumerates the ACL for a given file path.
 
-    .PARAMETER Path
-
-        The local/remote path to enumerate the ACLs for.
-
-    .PARAMETER Recurse
-        
-        If any ACL results are groups, recurse and retrieve user membership.
-
-    .EXAMPLE
-
-        PS C:\> Get-PathAcl "\\SERVER\Share\" 
-        
-        Returns ACLs for the given UNC share.
-#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$True, ValueFromPipeline=$True)]
@@ -1290,7 +917,6 @@ function Get-PathAcl {
 
         function Convert-FileRight {
 
-            # From http://stackoverflow.com/questions/28029872/retrieving-security-descriptor-and-getting-number-for-filesystemrights
 
             [CmdletBinding()]
             param(
@@ -1332,7 +958,7 @@ function Get-PathAcl {
 
             $Permissions = @()
 
-            # get simple permission
+
             $Permissions += $SimplePermissions.Keys |  % {
                               if (($FSR -band $_) -eq $_) {
                                 $SimplePermissions[$_]
@@ -1340,7 +966,7 @@ function Get-PathAcl {
                               }
                             }
 
-            # get remaining extended permissions
+
             $Permissions += $AccessMask.Keys |
                             ? { $FSR -band $_ } |
                             % { $AccessMask[$_] }
@@ -1393,28 +1019,7 @@ function Get-PathAcl {
 
 
 filter Get-NameField {
-<#
-    .SYNOPSIS
-    
-        Helper that attempts to extract appropriate field names from
-        passed computer objects.
 
-    .PARAMETER Object
-
-        The passed object to extract name fields from.
-
-    .PARAMETER DnsHostName
-        
-        A DnsHostName to extract through ValueFromPipelineByPropertyName.
-
-    .PARAMETER Name
-        
-        A Name to extract through ValueFromPipelineByPropertyName.
-
-    .EXAMPLE
-
-        PS C:\> Get-NetComputer -FullData | Get-NameField
-#>
     [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
@@ -1438,15 +1043,15 @@ filter Get-NameField {
     }
     elseif($Object) {
         if ( [bool]($Object.PSobject.Properties.name -match "dnshostname") ) {
-            # objects from Get-NetComputer
+
             $Object.dnshostname
         }
         elseif ( [bool]($Object.PSobject.Properties.name -match "name") ) {
-            # objects from Get-NetDomainController
+
             $Object.name
         }
         else {
-            # strings and catch alls
+
             $Object
         }
     }
@@ -1457,16 +1062,7 @@ filter Get-NameField {
 
 
 function Convert-LDAPProperty {
-<#
-    .SYNOPSIS
-    
-        Helper that converts specific LDAP property result fields.
-        Used by several of the Get-Net* function.
 
-    .PARAMETER Properties
-
-        Properties object to extract out LDAP fields for display.
-#>
     param(
         [Parameter(Mandatory=$True, ValueFromPipeline=$True)]
         [ValidateNotNullOrEmpty()]
@@ -1477,17 +1073,17 @@ function Convert-LDAPProperty {
 
     $Properties.PropertyNames | ForEach-Object {
         if (($_ -eq "objectsid") -or ($_ -eq "sidhistory")) {
-            # convert the SID to a string
+
             $ObjectProperties[$_] = (New-Object System.Security.Principal.SecurityIdentifier($Properties[$_][0],0)).Value
         }
         elseif($_ -eq "objectguid") {
-            # convert the GUID to a string
+
             $ObjectProperties[$_] = (New-Object Guid (,$Properties[$_][0])).Guid
         }
         elseif( ($_ -eq "lastlogon") -or ($_ -eq "lastlogontimestamp") -or ($_ -eq "pwdlastset") -or ($_ -eq "lastlogoff") -or ($_ -eq "badPasswordTime") ) {
-            # convert timestamps
+
             if ($Properties[$_][0] -is [System.MarshalByRefObject]) {
-                # if we have a System.__ComObject
+
                 $Temp = $Properties[$_][0]
                 [Int32]$High = $Temp.GetType().InvokeMember("HighPart", [System.Reflection.BindingFlags]::GetProperty, $null, $Temp, $null)
                 [Int32]$Low  = $Temp.GetType().InvokeMember("LowPart",  [System.Reflection.BindingFlags]::GetProperty, $null, $Temp, $null)
@@ -1498,7 +1094,7 @@ function Convert-LDAPProperty {
             }
         }
         elseif($Properties[$_][0] -is [System.MarshalByRefObject]) {
-            # try to convert misc com objects
+
             $Prop = $Properties[$_]
             try {
                 $Temp = $Prop[$_][0]
@@ -1524,53 +1120,10 @@ function Convert-LDAPProperty {
 
 
 
-########################################################
-#
-# Domain info functions below.
-#
-########################################################
+
 
 filter Get-DomainSearcher {
-<#
-    .SYNOPSIS
 
-        Helper used by various functions that takes an ADSpath and
-        domain specifier and builds the correct ADSI searcher object.
-
-    .PARAMETER Domain
-
-        The domain to use for the query, defaults to the current domain.
-
-    .PARAMETER DomainController
-
-        Domain controller to reflect LDAP queries through.
-
-    .PARAMETER ADSpath
-
-        The LDAP source to search through, e.g. "LDAP://OU=secret,DC=testlab,DC=local"
-        Useful for OU queries.
-
-    .PARAMETER ADSprefix
-
-        Prefix to set for the searcher (like "CN=Sites,CN=Configuration")
-
-    .PARAMETER PageSize
-
-        The PageSize to set for the LDAP searcher object.
-
-    .PARAMETER Credential
-
-        A [Management.Automation.PSCredential] object of alternate credentials
-        for connection to the target domain.
-
-    .EXAMPLE
-
-        PS C:\> Get-DomainSearcher -Domain testlab.local
-
-    .EXAMPLE
-
-        PS C:\> Get-DomainSearcher -Domain testlab.local -DomainController SECONDARY.dev.testlab.local
-#>
 
     param(
         [Parameter(ValueFromPipeline=$True)]
@@ -1609,7 +1162,7 @@ filter Get-DomainSearcher {
         }
     }
     elseif (-not $DomainController) {
-        # if a DC isn't specified
+
         try {
             $DomainController = ((Get-NetDomain -Credential $Credential).PdcRoleOwner).Name
         }
@@ -1678,21 +1231,7 @@ filter Get-DomainSearcher {
 
 
 filter Convert-DNSRecord {
-<#
-    .SYNOPSIS
 
-       Decodes a binary DNS record.
-
-       Adapted/ported from Michael B. Smith's code at https://raw.githubusercontent.com/mmessano/PowerShell/master/dns-dump.ps1
-
-    .PARAMETER DNSRecord
-
-        The domain to query for zones, defaults to the current domain.
-
-    .LINK
-
-        https://raw.githubusercontent.com/mmessano/PowerShell/master/dns-dump.ps1
-#>
     param(
         [Parameter(Position=0, ValueFromPipelineByPropertyName=$True, Mandatory=$True)]
         [Byte[]]
@@ -1700,7 +1239,7 @@ filter Convert-DNSRecord {
     )
 
     function Get-Name {
-        # modified decodeName from https://raw.githubusercontent.com/mmessano/PowerShell/master/dns-dump.ps1
+
         [CmdletBinding()]
         param(
             [Byte[]]
@@ -1761,7 +1300,7 @@ filter Convert-DNSRecord {
     }
 
     elseif($RDataType -eq 6) {
-        # TODO: how to implement properly? nested object?
+
         $Data = $([System.Convert]::ToBase64String($DNSRecord[24..$DNSRecord.length]))
         $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'SOA'
     }
@@ -1773,13 +1312,13 @@ filter Convert-DNSRecord {
     }
 
     elseif($RDataType -eq 13) {
-        # TODO: how to implement properly? nested object?
+
         $Data = $([System.Convert]::ToBase64String($DNSRecord[24..$DNSRecord.length]))
         $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'HINFO'
     }
 
     elseif($RDataType -eq 15) {
-        # TODO: how to implement properly? nested object?
+
         $Data = $([System.Convert]::ToBase64String($DNSRecord[24..$DNSRecord.length]))
         $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'MX'
     }
@@ -1798,13 +1337,13 @@ filter Convert-DNSRecord {
     }
 
     elseif($RDataType -eq 28) {
-        # TODO: how to implement properly? nested object?
+
         $Data = $([System.Convert]::ToBase64String($DNSRecord[24..$DNSRecord.length]))
         $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'AAAA'
     }
 
     elseif($RDataType -eq 33) {
-        # TODO: how to implement properly? nested object?
+
         $Data = $([System.Convert]::ToBase64String($DNSRecord[24..$DNSRecord.length]))
         $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'SRV'
     }
@@ -1824,45 +1363,7 @@ filter Convert-DNSRecord {
 
 
 filter Get-DNSZone {
-<#
-    .SYNOPSIS
 
-       Enumerates the Active Directory DNS zones for a given domain.
-
-    .PARAMETER Domain
-
-        The domain to query for zones, defaults to the current domain.
-
-    .PARAMETER DomainController
-
-        Domain controller to reflect LDAP queries through.
-
-    .PARAMETER PageSize
-
-        The PageSize to set for the LDAP searcher object.
-
-    .PARAMETER Credential
-
-        A [Management.Automation.PSCredential] object of alternate credentials
-        for connection to the target domain.
-
-    .PARAMETER FullData
-
-        Switch. Return full computer objects instead of just system names (the default).
-
-    .EXAMPLE
-
-        PS C:\> Get-DNSZone
-
-        Retrieves the DNS zones for the current domain.
-
-    .EXAMPLE
-
-        PS C:\> Get-DNSZone -Domain dev.testlab.local -DomainController primary.testlab.local
-
-        Retrieves the DNS zones for the dev.testlab.local domain, reflecting the LDAP queries
-        through the primary.testlab.local domain controller.
-#>
 
     param(
         [Parameter(Position=0, ValueFromPipeline=$True)]
@@ -1889,7 +1390,7 @@ filter Get-DNSZone {
     if($DNSSearcher) {
         $Results = $DNSSearcher.FindAll()
         $Results | Where-Object {$_} | ForEach-Object {
-            # convert/process the LDAP fields for each result
+
             $Properties = Convert-LDAPProperty -Properties $_.Properties
             $Properties | Add-Member NoteProperty 'ZoneName' $Properties.name
 
@@ -1910,7 +1411,7 @@ filter Get-DNSZone {
     if($DNSSearcher) {
         $Results = $DNSSearcher.FindAll()
         $Results | Where-Object {$_} | ForEach-Object {
-            # convert/process the LDAP fields for each result
+
             $Properties = Convert-LDAPProperty -Properties $_.Properties
             $Properties | Add-Member NoteProperty 'ZoneName' $Properties.name
 
@@ -1928,50 +1429,6 @@ filter Get-DNSZone {
 
 
 filter Get-DNSRecord {
-<#
-    .SYNOPSIS
-
-       Enumerates the Active Directory DNS records for a given zone.
-
-    .PARAMETER ZoneName
-
-        The zone to query for records (which can be enumearted with Get-DNSZone). Required.
-
-    .PARAMETER Domain
-
-        The domain to query for zones, defaults to the current domain.
-
-    .PARAMETER DomainController
-
-        Domain controller to reflect LDAP queries through.
-
-    .PARAMETER PageSize
-
-        The PageSize to set for the LDAP searcher object.
-
-    .PARAMETER Credential
-
-        A [Management.Automation.PSCredential] object of alternate credentials
-        for connection to the target domain.
-
-    .EXAMPLE
-
-        PS C:\> Get-DNSRecord -ZoneName testlab.local
-
-        Retrieve all records for the testlab.local zone.
-
-    .EXAMPLE
-
-        PS C:\> Get-DNSZone | Get-DNSRecord
-
-        Retrieve all records for all zones in the current domain.
-
-    .EXAMPLE
-
-        PS C:\> Get-DNSZone -Domain dev.testlab.local | Get-DNSRecord -Domain dev.testlab.local
-
-        Retrieve all records for all zones in the dev.testlab.local domain.
-#>
 
     param(
         [Parameter(Position=0, ValueFromPipelineByPropertyName=$True, Mandatory=$True)]
@@ -1999,13 +1456,13 @@ filter Get-DNSRecord {
         $Results = $DNSSearcher.FindAll()
         $Results | Where-Object {$_} | ForEach-Object {
             try {
-                # convert/process the LDAP fields for each result
+
                 $Properties = Convert-LDAPProperty -Properties $_.Properties | Select-Object name,distinguishedname,dnsrecord,whencreated,whenchanged
                 $Properties | Add-Member NoteProperty 'ZoneName' $ZoneName
 
-                # convert the record and extract the properties
+
                 if ($Properties.dnsrecord -is [System.DirectoryServices.ResultPropertyValueCollection]) {
-                    # TODO: handle multiple nested records properly?
+
                     $Record = Convert-DNSRecord -DNSRecord $Properties.dnsrecord[0]
                 }
                 else {
@@ -2032,32 +1489,7 @@ filter Get-DNSRecord {
 
 
 filter Get-NetDomain {
-<#
-    .SYNOPSIS
 
-        Returns a given domain object.
-
-    .PARAMETER Domain
-
-        The domain name to query for, defaults to the current domain.
-
-    .PARAMETER Credential
-
-        A [Management.Automation.PSCredential] object of alternate credentials
-        for connection to the target domain.
-
-    .EXAMPLE
-
-        PS C:\> Get-NetDomain -Domain testlab.local
-
-    .EXAMPLE
-
-        PS C:\> "testlab.local" | Get-NetDomain
-
-    .LINK
-
-        http://social.technet.microsoft.com/Forums/scriptcenter/en-US/0c5b3f83-e528-4d49-92a4-dee31f4b481c/finding-the-dn-of-the-the-domain-without-admodule-in-powershell?forum=ITCG
-#>
 
     param(
         [Parameter(ValueFromPipeline=$True)]
@@ -2073,7 +1505,7 @@ filter Get-NetDomain {
         Write-Verbose "Using alternate credentials for Get-NetDomain"
 
         if(!$Domain) {
-            # if no domain is supplied, extract the logon domain from the PSCredential passed
+
             $Domain = $Credential.GetNetworkCredential().Domain
             Write-Verbose "Extracted domain '$Domain' from -Credential"
         }
@@ -2105,28 +1537,7 @@ filter Get-NetDomain {
 
 
 filter Get-NetForest {
-<#
-    .SYNOPSIS
 
-        Returns a given forest object.
-
-    .PARAMETER Forest
-
-        The forest name to query for, defaults to the current domain.
-
-    .PARAMETER Credential
-
-        A [Management.Automation.PSCredential] object of alternate credentials
-        for connection to the target domain.
-
-    .EXAMPLE
-    
-        PS C:\> Get-NetForest -Forest external.domain
-
-    .EXAMPLE
-    
-        PS C:\> "external.domain" | Get-NetForest
-#>
 
     param(
         [Parameter(ValueFromPipeline=$True)]
@@ -2142,7 +1553,7 @@ filter Get-NetForest {
         Write-Verbose "Using alternate credentials for Get-NetForest"
 
         if(!$Forest) {
-            # if no domain is supplied, extract the logon domain from the PSCredential passed
+
             $Forest = $Credential.GetNetworkCredential().Domain
             Write-Verbose "Extracted domain '$Forest' from -Credential"
         }
@@ -2168,12 +1579,12 @@ filter Get-NetForest {
         }
     }
     else {
-        # otherwise use the current forest
+
         $ForestObject = [System.DirectoryServices.ActiveDirectory.Forest]::GetCurrentForest()
     }
 
     if($ForestObject) {
-        # get the SID of the forest root
+
         $ForestSid = (New-Object System.Security.Principal.NTAccount($ForestObject.RootDomain,"krbtgt")).Translate([System.Security.Principal.SecurityIdentifier]).Value
         $Parts = $ForestSid -Split "-"
         $ForestSid = $Parts[0..$($Parts.length-2)] -join "-"
@@ -2184,28 +1595,6 @@ filter Get-NetForest {
 
 
 filter Get-NetForestDomain {
-<#
-    .SYNOPSIS
-
-        Return all domains for a given forest.
-
-    .PARAMETER Forest
-
-        The forest name to query domain for.
-
-    .PARAMETER Credential
-
-        A [Management.Automation.PSCredential] object of alternate credentials
-        for connection to the target domain.
-
-    .EXAMPLE
-
-        PS C:\> Get-NetForestDomain
-
-    .EXAMPLE
-
-        PS C:\> Get-NetForestDomain -Forest external.local
-#>
 
     param(
         [Parameter(ValueFromPipeline=$True)]
@@ -2225,24 +1614,7 @@ filter Get-NetForestDomain {
 
 
 filter Get-NetForestCatalog {
-<#
-    .SYNOPSIS
 
-        Return all global catalogs for a given forest.
-
-    .PARAMETER Forest
-
-        The forest name to query domain for.
-
-    .PARAMETER Credential
-
-        A [Management.Automation.PSCredential] object of alternate credentials
-        for connection to the target domain.
-
-    .EXAMPLE
-
-        PS C:\> Get-NetForestCatalog
-#>
     
     param(
         [Parameter(ValueFromPipeline=$True)]
@@ -2262,46 +1634,7 @@ filter Get-NetForestCatalog {
 
 
 filter Get-NetDomainController {
-<#
-    .SYNOPSIS
 
-        Return the current domain controllers for the active domain.
-
-    .PARAMETER Domain
-
-        The domain to query for domain controllers, defaults to the current domain.
-
-    .PARAMETER DomainController
-
-        Domain controller to reflect LDAP queries through.
-
-    .PARAMETER LDAP
-
-        Switch. Use LDAP queries to determine the domain controllers.
-
-    .PARAMETER Credential
-
-        A [Management.Automation.PSCredential] object of alternate credentials
-        for connection to the target domain.
-
-    .EXAMPLE
-
-        PS C:\> Get-NetDomainController -Domain 'test.local'
-        
-        Determine the domain controllers for 'test.local'.
-
-    .EXAMPLE
-
-        PS C:\> Get-NetDomainController -Domain 'test.local' -LDAP
-
-        Determine the domain controllers for 'test.local' using LDAP queries.
-
-    .EXAMPLE
-
-        PS C:\> 'test.local' | Get-NetDomainController
-
-        Determine the domain controllers for 'test.local'.
-#>
 
     [CmdletBinding()]
     param(
@@ -2320,7 +1653,7 @@ filter Get-NetDomainController {
     )
 
     if($LDAP -or $DomainController) {
-        # filter string to return all domain controllers
+
         Get-NetComputer -Domain $Domain -DomainController $DomainController -Credential $Credential -FullData -Filter '(userAccountControl:1.2.840.113556.1.4.803:=8192)'
     }
     else {
@@ -2332,75 +1665,9 @@ filter Get-NetDomainController {
 }
 
 
-########################################################
-#
-# "net *" replacements and other fun start below
-#
-########################################################
 
 function Get-NetUser {
-<#
-    .SYNOPSIS
 
-        Query information for a given user or users in the domain
-        using ADSI and LDAP. Another -Domain can be specified to
-        query for users across a trust.
-        Replacement for "net users /domain"
-
-    .PARAMETER UserName
-
-        Username filter string, wildcards accepted.
-
-    .PARAMETER Domain
-
-        The domain to query for users, defaults to the current domain.
-
-    .PARAMETER DomainController
-
-        Domain controller to reflect LDAP queries through.
-
-    .PARAMETER ADSpath
-
-        The LDAP source to search through, e.g. "LDAP://OU=secret,DC=testlab,DC=local"
-        Useful for OU queries.
-
-    .PARAMETER Filter
-
-        A customized ldap filter string to use, e.g. "(description=*admin*)"
-
-    .PARAMETER AdminCount
-
-        Switch. Return users with adminCount=1.
-
-    .PARAMETER SPN
-
-        Switch. Only return user objects with non-null service principal names.
-
-    .PARAMETER Unconstrained
-
-        Switch. Return users that have unconstrained delegation.
-
-    .PARAMETER AllowDelegation
-
-        Switch. Return user accounts that are not marked as 'sensitive and not allowed for delegation'
-
-    .PARAMETER PageSize
-
-        The PageSize to set for the LDAP searcher object.
-
-    .PARAMETER Credential
-
-        A [Management.Automation.PSCredential] object of alternate credentials
-        for connection to the target domain.
-
-    .EXAMPLE
-
-        PS C:\> Get-NetUser -Domain testing
-
-    .EXAMPLE
-
-        PS C:\> Get-NetUser -ADSpath "LDAP://OU=secret,DC=testlab,DC=local"
-#>
 
     param(
         [Parameter(Position=0, ValueFromPipeline=$True)]
